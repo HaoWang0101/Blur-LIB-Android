@@ -247,23 +247,45 @@ class BlurBehindLayout : FrameLayout {
     }
 
     private fun renderBehindViewToTexture() {
-        val commonRenderer = commonRenderer!!
+        val commonRenderer = commonRenderer ?: return
 
-        val glCanvas = commonRenderer.behindViewSurfaceTexture.beginDraw()
+        // 尝试绘制前先判断 viewBehind 状态
+        val targetView = viewBehind
+        if (targetView == null || !targetView.isAttachedToWindow) return
 
-        glCanvas?.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-        viewBehind?.getLocationInWindow(behindViewPosition)
-        getLocationInWindow(thisViewPosition)
+        // 开始绘制纹理
+        val glCanvas = commonRenderer.behindViewSurfaceTexture.beginDraw() ?: return
 
-        glCanvas?.scale(commonRenderer.scale, commonRenderer.scale)
-        glCanvas?.translate(0f, paddingVertical * 0.5f)
-        val behindMatrix = viewBehind?.matrix
-        behindMatrix?.postTranslate(behindViewPosition[0] - thisViewPosition[0].toFloat() - paddingLeft, behindViewPosition[1] - thisViewPosition[1].toFloat() - paddingTop)
-        glCanvas?.concat(behindMatrix)
+        try {
+            // 清除背景
+            glCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
 
-        viewBehind?.draw(glCanvas)
+            // 计算位置
+            targetView.getLocationInWindow(behindViewPosition)
+            getLocationInWindow(thisViewPosition)
 
-        commonRenderer.behindViewSurfaceTexture.endDraw(glCanvas)
+            // 缩放并平移
+            glCanvas.scale(commonRenderer.scale, commonRenderer.scale)
+            glCanvas.translate(0f, paddingVertical * 0.5f)
+
+            // 获取并变换 matrix
+            val behindMatrix = targetView.matrix
+            behindMatrix.postTranslate(
+                behindViewPosition[0] - thisViewPosition[0].toFloat() - paddingLeft,
+                behindViewPosition[1] - thisViewPosition[1].toFloat() - paddingTop
+            )
+
+            glCanvas.concat(behindMatrix)
+
+            // 安全绘制
+            targetView.draw(glCanvas)
+
+        } catch (e: Exception) {
+            Log.e("BlurBehind", "Error while rendering behind view: ${e.message}", e)
+        } finally {
+            // 释放绘制资源
+            commonRenderer.behindViewSurfaceTexture.endDraw(glCanvas)
+        }
     }
 
     private fun renderChildViewToTexture() {

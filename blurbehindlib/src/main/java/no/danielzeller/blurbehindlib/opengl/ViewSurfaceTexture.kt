@@ -42,13 +42,14 @@ class ViewSurfaceTexture {
         surfaceTexture = null
     }
 
-    fun beginDraw(): Canvas? {
 
-        if (surface != null) {
-            return surface?.lockHardwareCanvas()
-        }
-        return null
+    // 引入 try - catch 避免已经释放后无法判断
+    fun beginDraw(): Canvas? = try {
+        surface?.lockHardwareCanvas()
+    } catch (e: IllegalStateException) {
+        null
     }
+
 
     fun endDraw(surfaceCanvas: Canvas?) {
         if (surfaceCanvas != null) {
